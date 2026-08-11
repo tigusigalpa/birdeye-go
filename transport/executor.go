@@ -52,6 +52,13 @@ func NewExecutor(cfg ExecutorConfig) *Executor {
 // for this call only; pass "" to use the client default. body is
 // JSON-marshaled for POST/PUT/PATCH and ignored for GET/DELETE.
 func (e *Executor) Do(ctx context.Context, method, path string, query map[string]string, chain string, body interface{}, result interface{}) (*ResponseMeta, error) {
+	return e.DoWithHeaders(ctx, method, path, query, chain, nil, body, result)
+}
+
+// DoWithHeaders is Do with additional per-request headers. Authentication and
+// x-chain remain controlled by the executor; custom headers are intended for
+// Birdeye endpoint-family headers such as x-perp.
+func (e *Executor) DoWithHeaders(ctx context.Context, method, path string, query map[string]string, chain string, headers http.Header, body interface{}, result interface{}) (*ResponseMeta, error) {
 	endpoint := path
 	if len(query) > 0 {
 		values := url.Values{}
@@ -105,7 +112,7 @@ func (e *Executor) Do(ctx context.Context, method, path string, query map[string
 			}
 		}
 
-		meta, err := e.attempt(ctx, method, endpoint, chain, bodyBytes, result)
+		meta, err := e.attempt(ctx, method, endpoint, chain, headers, bodyBytes, result)
 		if meta != nil {
 			meta.Attempts = attempt
 		}
@@ -141,19 +148,25 @@ func retryDelay(policy *RetryPolicy, attempt int, lastMeta *ResponseMeta) time.D
 }
 
 func isRetryable(meta *ResponseMeta, err error) bool {
-	var netErr interface{ Temporary() bool }
-	if errors.As(err, &netErr) && netErr.Temporary() {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var netErr interface {
+		Timeout() bool
+		Temporary() bool
+	}
+	if errors.As(err, &netErr) && (netErr.Timeout() || netErr.Temporary()) {
 		return true
 	}
 	if meta == nil {
 		// No response at all (connection error, timeout) is retryable.
 		return true
 	}
-	return meta.HTTPStatus == http.StatusTooManyRequests || meta.HTTPStatus >= 500
+	return meta.HTTPStatus == http.StatusTooManyRequests
 }
 
-func (e *Executor) attempt(ctx context.Context, method, endpoint, chain string, bodyBytes []byte, result interface{}) (*ResponseMeta, error) {
-	fullURL := e.cfg.BaseURL + endpoint
+func (e *Executor) attempt(ctx context.Context, method, endpoint, chain string, headers http.Header, bodyBytes []byte, result interface{}) (*ResponseMeta, error) {
+	fullURL := strings.TrimRight(e.cfg.BaseURL, "/") + "/" + strings.TrimLeft(endpoint, "/")
 
 	var reader io.Reader
 	if len(bodyBytes) > 0 {
@@ -164,6 +177,13 @@ func (e *Executor) attempt(ctx context.Context, method, endpoint, chain string, 
 	if err != nil {
 		return nil, fmt.Errorf("birdeye: build request: %w", err)
 	}
+	req.Header.Set("X-API-KEY", e.cfg.APIKey)
+	for key, values := range headers {
+		for _, value := range values {
+			req.Header.Add(key, value)
+		}
+	}
+	// Do not permit a per-call header to replace the configured credential.
 	req.Header.Set("X-API-KEY", e.cfg.APIKey)
 	if chain != "" {
 		req.Header.Set("x-chain", chain)
@@ -194,6 +214,7 @@ func (e *Executor) attempt(ctx context.Context, method, endpoint, chain string, 
 		Headers:    resp.Header,
 		Attempts:   1,
 	}
+	meta.RequestID = firstHeader(resp.Header, "X-Request-ID", "Request-ID", "X-Request-Id")
 
 	var envelope struct {
 		Success bool            `json:"success"`
@@ -206,8 +227,12 @@ func (e *Executor) attempt(ctx context.Context, method, endpoint, chain string, 
 		meta.Message = envelope.Message
 	}
 
+	code, responseMessage := decodeErrorDetails(respBody)
+	if envelope.Message == "" {
+		envelope.Message = responseMessage
+	}
 	if sentinel := MapHTTPStatus(resp.StatusCode); sentinel != nil {
-		return meta, fmt.Errorf("%w: %w", sentinel, &BirdeyeError{HTTPStatus: resp.StatusCode, Success: envelope.Success, Message: envelope.Message, Raw: respBody})
+		return meta, fmt.Errorf("%w: %w", sentinel, &BirdeyeError{HTTPStatus: resp.StatusCode, Code: code, RequestID: meta.RequestID, Success: envelope.Success, Message: envelope.Message, Raw: respBody})
 	}
 
 	if decodeErr != nil {
@@ -215,7 +240,7 @@ func (e *Executor) attempt(ctx context.Context, method, endpoint, chain string, 
 	}
 
 	if !envelope.Success {
-		return meta, &BirdeyeError{HTTPStatus: resp.StatusCode, Success: false, Message: envelope.Message, Raw: respBody}
+		return meta, &BirdeyeError{HTTPStatus: resp.StatusCode, Code: code, RequestID: meta.RequestID, Success: false, Message: envelope.Message, Raw: respBody}
 	}
 
 	if result != nil && len(envelope.Data) > 0 && string(envelope.Data) != "null" {
@@ -225,4 +250,13 @@ func (e *Executor) attempt(ctx context.Context, method, endpoint, chain string, 
 	}
 
 	return meta, nil
+}
+
+func firstHeader(headers http.Header, keys ...string) string {
+	for _, key := range keys {
+		if value := headers.Get(key); value != "" {
+			return value
+		}
+	}
+	return ""
 }

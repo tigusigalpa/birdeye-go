@@ -144,7 +144,7 @@ func TestDo_MapsHTTPStatusSentinel(t *testing.T) {
 	}
 }
 
-func TestDo_RetriesOnlyGETRequests(t *testing.T) {
+func TestDo_RetriesOnlyRateLimitedGETRequests(t *testing.T) {
 	var getAttempts, postAttempts int
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -153,8 +153,13 @@ func TestDo_RetriesOnlyGETRequests(t *testing.T) {
 		} else {
 			postAttempts++
 		}
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{"success":false,"message":"error"}`))
+		if r.Method == http.MethodGet {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"success":false,"message":"rate limited"}`))
+			return
+		}
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"success":false,"message":"rate limited"}`))
 	}))
 	defer server.Close()
 
@@ -175,6 +180,49 @@ func TestDo_RetriesOnlyGETRequests(t *testing.T) {
 	}
 	if postAttempts != 1 {
 		t.Errorf("POST attempts = %d, want 1 (never retried)", postAttempts)
+	}
+}
+
+func TestDo_DoesNotRetryServerErrors(t *testing.T) {
+	attempts := 0
+	exec, _ := newTestExecutor(t, func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"success":false,"message":"temporary server failure"}`))
+	}, "k")
+	exec.cfg.RetryPolicy = &RetryPolicy{MaxAttempts: 3, BaseDelay: time.Millisecond, MaxDelay: time.Millisecond, MaxElapsed: time.Second}
+	_, err := exec.Do(context.Background(), http.MethodGet, "/path", nil, "", nil, nil)
+	if !errors.Is(err, ErrServerError) || attempts != 1 {
+		t.Fatalf("server errors must not be retried: attempts=%d err=%v", attempts, err)
+	}
+}
+
+func TestDo_CapturesRequestIDAndErrorCode(t *testing.T) {
+	exec, _ := newTestExecutor(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Request-ID", "req-123")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"success":false,"code":1001,"message":"invalid address"}`))
+	}, "k")
+	meta, err := exec.Do(context.Background(), http.MethodGet, "/path", nil, "", nil, nil)
+	var apiErr *BirdeyeError
+	if !errors.As(err, &apiErr) || apiErr.Code != "1001" || apiErr.RequestID != "req-123" || meta.RequestID != "req-123" {
+		t.Fatalf("unexpected error metadata: meta=%+v err=%+v", meta, apiErr)
+	}
+}
+
+func TestDoWithHeaders_AddsEndpointSpecificHeaderWithoutReplacingAPIKey(t *testing.T) {
+	exec, _ := newTestExecutor(t, func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("x-perp"); got != "true" {
+			t.Errorf("x-perp = %q, want true", got)
+		}
+		if got := r.Header.Get("X-API-KEY"); got != "configured-key" {
+			t.Errorf("X-API-KEY = %q, want configured-key", got)
+		}
+		_, _ = w.Write([]byte(`{"success":true,"data":{}}`))
+	}, "configured-key")
+	_, err := exec.DoWithHeaders(context.Background(), http.MethodGet, "/perps/v1/token/list", nil, "", http.Header{"x-perp": {"true"}, "X-API-KEY": {"replacement"}}, nil, nil)
+	if err != nil {
+		t.Fatalf("DoWithHeaders: %v", err)
 	}
 }
 

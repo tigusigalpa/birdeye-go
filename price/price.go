@@ -201,3 +201,69 @@ func (c *Client) GetOHLCVv3Pair(ctx context.Context, opts PairOHLCVOptions) (*Pa
 	}
 	return &result, nil
 }
+
+// GetHistoricalPriceSeries returns a bounded price series for a token or pair.
+// The response object's field schema is not published as stable, so its fields
+// are returned verbatim in RawObject.
+//
+// Docs: https://docs.birdeye.so/reference/get-defi-history_price
+func (c *Client) GetHistoricalPriceSeries(ctx context.Context, opts HistoricalSeriesOptions) (RawObject, error) {
+	query := map[string]string{"address": opts.Address, "address_type": opts.AddressType, "type": opts.Type, "time_from": strconv.FormatInt(opts.TimeFrom, 10), "time_to": strconv.FormatInt(opts.TimeTo, 10)}
+	if opts.UIAmountMode != "" {
+		query["ui_amount_mode"] = opts.UIAmountMode
+	}
+	var result RawObject
+	_, err := c.executor.Do(ctx, http.MethodGet, "/defi/history_price", query, opts.Chain, nil, &result)
+	return result, err
+}
+
+// GetOHLCVBaseQuote returns aggregated legacy-format candles for a base/quote
+// market. The legacy token and pair OHLCV routes are deprecated and therefore
+// intentionally have no SDK methods.
+//
+// Docs: https://docs.birdeye.so/reference/get-defi-ohlcv-base_quote
+func (c *Client) GetOHLCVBaseQuote(ctx context.Context, opts BaseQuoteOHLCVOptions) (RawObject, error) {
+	query := map[string]string{"base_address": opts.BaseAddress, "quote_address": opts.QuoteAddress, "type": opts.Type, "time_from": strconv.FormatInt(opts.TimeFrom, 10), "time_to": strconv.FormatInt(opts.TimeTo, 10)}
+	if opts.UIAmountMode != "" {
+		query["ui_amount_mode"] = opts.UIAmountMode
+	}
+	var result RawObject
+	_, err := c.executor.Do(ctx, http.MethodGet, "/defi/ohlcv/base_quote", query, opts.Chain, nil, &result)
+	return result, err
+}
+
+// GetPriceVolume returns the current price and rolling volume for one token.
+// Its response fields are preserved verbatim because Birdeye does not publish
+// a stable field schema for this endpoint.
+//
+// Docs: https://docs.birdeye.so/reference/get-defi-price_volume-single
+func (c *Client) GetPriceVolume(ctx context.Context, address string, opts PriceVolumeOptions) (RawObject, error) {
+	query := map[string]string{"address": address}
+	if opts.Type != "" {
+		query["type"] = opts.Type
+	}
+	if opts.UIAmountMode != "" {
+		query["ui_amount_mode"] = opts.UIAmountMode
+	}
+	var result RawObject
+	_, err := c.executor.Do(ctx, http.MethodGet, "/defi/price_volume/single", query, opts.Chain, nil, &result)
+	return result, err
+}
+
+// GetMultiPriceVolume returns current price and rolling volume for multiple
+// tokens. POST requests are deliberately not retried by the shared transport.
+//
+// Docs: https://docs.birdeye.so/reference/post-defi-price_volume-multi
+func (c *Client) GetMultiPriceVolume(ctx context.Context, request PriceVolumeMultiRequest) (RawObject, error) {
+	query := map[string]string{}
+	if request.UIAmountMode != "" {
+		query["ui_amount_mode"] = request.UIAmountMode
+	}
+	body := struct {
+		ListAddress string `json:"list_address"`
+		Type        string `json:"type,omitempty"`
+	}{ListAddress: strings.Join(request.Addresses, ","), Type: request.Type}
+	var result RawObject
+	_, err := c.executor.Do(ctx, http.MethodPost, "/defi/price_volume/multi", query, request.Chain, body, &result)
+	return result, err
+}

@@ -115,6 +115,20 @@ func WithRetryPolicy(policy *RetryPolicy) Option {
 	return func(c *ClientConfig) { c.RetryPolicy = policy }
 }
 
+// WithRetries changes only the maximum number of attempts while retaining the
+// default backoff bounds. Values below one disable retries. GET requests alone
+// are eligible; unsafe methods are never retried automatically.
+func WithRetries(maxAttempts int) Option {
+	return func(c *ClientConfig) {
+		policy := transport.NewDefaultRetryPolicy()
+		if maxAttempts < 1 {
+			maxAttempts = 1
+		}
+		policy.MaxAttempts = maxAttempts
+		c.RetryPolicy = policy
+	}
+}
+
 func newConfig(apiKey string, opts ...Option) *ClientConfig {
 	cfg := &ClientConfig{
 		APIKey:      apiKey,
@@ -178,4 +192,11 @@ func NewClient(apiKey string, opts ...Option) *Client {
 // field (nil to discard it).
 func (c *Client) Do(ctx context.Context, method, path string, query map[string]string, chain string, body interface{}, result interface{}) (*transport.ResponseMeta, error) {
 	return c.executor.Do(ctx, method, path, query, chain, body, result)
+}
+
+// DoWithHeaders is the raw escape hatch for endpoints that require an
+// endpoint-specific header, such as x-perp. X-API-KEY is always taken from
+// the client configuration and cannot be overridden here.
+func (c *Client) DoWithHeaders(ctx context.Context, method, path string, query map[string]string, chain string, headers http.Header, body interface{}, result interface{}) (*transport.ResponseMeta, error) {
+	return c.executor.DoWithHeaders(ctx, method, path, query, chain, headers, body, result)
 }

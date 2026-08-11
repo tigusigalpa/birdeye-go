@@ -1,26 +1,10 @@
 # Birdeye Go SDK
 
-An idiomatic Go client for the [Birdeye](https://birdeye.so) crypto market data API (`https://public-api.birdeye.so`), written from scratch against Birdeye's official documentation — not generated code.
+![BirdEye Golang SDK](https://i.postimg.cc/FFqTsjMG/birdeye-golang-github.jpg)
 
-**Author:** Igor Sazonov — [sovletig@gmail.com](mailto:sovletig@gmail.com) — [github.com/tigusigalpa](https://github.com/tigusigalpa)
+A small, dependable Go client for the [Birdeye public API](https://docs.birdeye.so/reference/birdeye-api-getting-started). It is built for applications that need current token prices and chart data without hiding HTTP details, swallowing API errors, or making surprise retries.
 
-**Package:** a matching PHP/Laravel SDK is available at `tigusigalpa/birdeye-php`.
-
----
-
-## Status
-
-**This is an early, honest checkpoint, not a finished library.** Only the **Price & OHLCV** family is implemented and tested: single/multi-token real-time price, v3 OHLCV candles (token and pair), and historical price by Unix timestamp. Every other documented family — token/pair stats, token/market lists, transactions, wallet/net-worth/PnL, balance/transfer, holders, Perps Data API, Blockchain Data API, x402, and WebSocket subscriptions — is **not yet implemented**. See [docs/endpoints.md](docs/endpoints.md) for the exact, hand-maintained list of what's covered, with a direct Birdeye documentation link per method.
-
-We'd rather ship a small, correct surface than a large, half-tested one. If you need broader coverage today, use the raw request escape hatch (`Client.Do`) to call any endpoint this SDK hasn't mapped yet.
-
----
-
-## Why this exists
-
-Building each endpoint by hand, one at a time, against Birdeye's real documentation — with typed requests/responses, tests, and a docs entry — trades coverage speed for correctness: what's here is verified against the docs, not guessed. Where a response field's exact shape couldn't be confirmed, this SDK does not fabricate it.
-
----
+Maintained by [Igor Sazonov](https://github.com/tigusigalpa) · [sovletig@gmail.com](mailto:sovletig@gmail.com). This is an independent community project, not an official Birdeye SDK.
 
 ## Install
 
@@ -28,130 +12,107 @@ Building each endpoint by hand, one at a time, against Birdeye's real documentat
 go get github.com/tigusigalpa/birdeye-go
 ```
 
-Requires Go 1.22 or newer.
+Go 1.22 or later is required.
 
----
+## Start here
 
-## Authentication and configuration
+Put your key in the environment, not in source control:
 
-Read `BIRDEYE_API_KEY` from an environment variable or your own secret store — never hardcode it:
-
-```go
-client := birdeye.NewClient(os.Getenv("BIRDEYE_API_KEY"))
+```bash
+export BIRDEYE_API_KEY="..."
 ```
-
-Birdeye requires the `X-API-KEY` header on every request; `NewClient` sends it automatically. Some endpoint families also require an `x-chain` header (Birdeye defaults to `"solana"` server-side when it's omitted). Set a client-wide default with `WithChain`, or override it per call via each method's `Options.Chain` field:
-
-```go
-client := birdeye.NewClient(apiKey, birdeye.WithChain(birdeye.ChainEthereum))
-
-// Override just this one call:
-result, err := client.Price.GetPrice(ctx, address, price.PriceOptions{Chain: birdeye.ChainSolana})
-```
-
-Data accessibility (which endpoints/chains you can call) is determined by your Birdeye plan (Standard/Lite/Starter/Premium/Business/Enterprise). This SDK does **not** validate plan access client-side — a request Birdeye rejects for your plan returns a normal API error (`transport.ErrForbidden`), same as any other error.
-
----
-
-## Quick start
 
 ```go
 package main
 
 import (
-	"context"
-	"fmt"
-	"log"
-	"os"
+    "context"
+    "fmt"
+    "os"
 
-	birdeye "github.com/tigusigalpa/birdeye-go"
-	"github.com/tigusigalpa/birdeye-go/price"
+    birdeye "github.com/tigusigalpa/birdeye-go"
+    "github.com/tigusigalpa/birdeye-go/price"
 )
 
 func main() {
-	client := birdeye.NewClient(os.Getenv("BIRDEYE_API_KEY"), birdeye.WithChain(birdeye.ChainSolana))
-
-	result, err := client.Price.GetPrice(context.Background(), "So11111111111111111111111111111111111111112", price.PriceOptions{})
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("price:", result.Value)
+    client := birdeye.NewClient(os.Getenv("BIRDEYE_API_KEY"), birdeye.WithChain(birdeye.ChainSolana))
+    quote, err := client.Price.GetPrice(context.Background(), "So11111111111111111111111111111111111111112", price.PriceOptions{})
+    if err != nil { panic(err) }
+    fmt.Println(quote.Value)
 }
 ```
 
-Runnable examples: [examples/](examples/) — `get_price`, `get_ohlcv`, `multi_price`, `error_handling`.
+Birdeye receives `X-API-KEY` on every request. `WithChain` supplies a default `x-chain`; each request options struct also has a `Chain` field for a one-off override. The client deliberately does not guess whether your Birdeye plan has access to an endpoint—Birdeye remains the authority and returns an ordinary API error when access is denied.
 
----
+## What is included
 
-## Supported services
+| Area | Methods | Birdeye reference |
+|---|---|---|
+| Spot prices | Single price; multi-price (GET and POST) | [Price & OHLCV](https://docs.birdeye.so/reference/price-ohlcv) |
+| Historical prices | Point-in-time and time-series price | [Historical price](https://docs.birdeye.so/reference/get-defi-history_price) |
+| Candles | V3 token/pair OHLCV and base/quote OHLCV | [OHLCV V3](https://docs.birdeye.so/reference/get-defi-v3-ohlcv) |
+| Rolling activity | Single and batch price-volume snapshots | [Price volume](https://docs.birdeye.so/reference/get-defi-price_volume-single) |
 
-| Service | Docs |
-|---|---|
-| `Client.Price` | [Price & OHLCV overview](https://docs.birdeye.so/reference/price-ohlcv) |
+The detailed route-to-method map is in [docs/endpoints.md](docs/endpoints.md). When Birdeye has not published a stable field schema, those methods return `price.RawObject`, preserving each response field as `json.RawMessage` instead of inventing a brittle model.
 
-Full per-method mapping: [docs/endpoints.md](docs/endpoints.md).
+The legacy `/defi/ohlcv` and `/defi/ohlcv/pair` endpoints are deprecated upstream, so this package intentionally does not wrap them. Wallets, transactions, token lists, Perps, blockchain data, x402, and WebSockets are not yet mapped as typed services.
 
----
+## Examples
 
-## Error handling and retries
-
-Every error can be matched with `errors.Is` against a sentinel (`transport.ErrUnauthorized`, `transport.ErrForbidden`, `transport.ErrRateLimited`, `transport.ErrNotFound`, `transport.ErrServerError`, ...) or unwrapped with `errors.As` into a `*transport.BirdeyeError` for the exact HTTP status, message, and raw response body Birdeye sent — nothing is silently dropped.
-
-```go
-var birdeyeErr *transport.BirdeyeError
-if errors.As(err, &birdeyeErr) {
-	fmt.Println(birdeyeErr.HTTPStatus, birdeyeErr.Message)
-}
-```
-
-GET requests retry automatically (bounded exponential backoff with full jitter, honoring a `Retry-After` response header when present) via a conservative default `RetryPolicy` (3 attempts, 250ms-5s backoff, 20s max elapsed). POST requests are **never** auto-retried. Override with `WithRetryPolicy`, or disable retries entirely with `birdeye.NoRetry()`.
-
----
-
-## Raw request escape hatch
-
-Call any Birdeye endpoint — including ones this SDK hasn't mapped to a typed method yet — without waiting for an SDK update:
-
-```go
-var result map[string]any
-_, err := client.Do(ctx, http.MethodGet, "/defi/token_overview", map[string]string{"address": addr}, "", nil, &result)
-```
-
----
-
-## Testing
+The runnable examples read `BIRDEYE_API_KEY` themselves:
 
 ```bash
-go test ./...     # unit tests (offline, httptest-backed, no API key required)
+go run ./examples/get_price
+go run ./examples/get_ohlcv
+go run ./examples/multi_price
+go run ./examples/error_handling
+go run ./examples/token_search
+go run ./examples/wallet_pnl # also requires BIRDEYE_WALLET
+```
+
+## Errors and retries
+
+Use `errors.Is` for common HTTP outcomes, or `errors.As` to inspect the original Birdeye error. `BirdeyeError` carries the HTTP status, Birdeye error code when supplied, request ID, message, and a size-limited raw response body.
+
+```go
+var apiErr *transport.BirdeyeError
+if errors.As(err, &apiErr) {
+    fmt.Println(apiErr.HTTPStatus, apiErr.Code, apiErr.RequestID)
+}
+```
+
+GET requests retry only on HTTP 429 and transient network errors. Retries use bounded exponential backoff with jitter and honour `Retry-After`. POST requests are never retried automatically. Configure the policy with `birdeye.WithRetryPolicy(...)`, or pass `birdeye.NoRetry()` to turn it off.
+
+## Any endpoint, today
+
+`Client.Do` is an escape hatch for new Birdeye routes. It still handles authentication, chain selection, envelope decoding, errors, and safe retry behaviour.
+
+```go
+var data map[string]any
+_, err := client.Do(ctx, "GET", "/defi/token_overview", map[string]string{"address": address}, "", nil, &data)
+```
+
+For endpoint-specific headers such as `x-perp`, use `DoWithHeaders`. It cannot replace the client's API key.
+
+```go
+_, err := client.DoWithHeaders(ctx, "GET", "/perps/v1/token/list", nil, "", http.Header{"x-perp": {"true"}}, nil, &data)
+```
+
+## Development checks
+
+Tests are hand-authored `httptest` fixtures and never call Birdeye or consume Compute Units.
+
+```bash
+go test ./...
+go test -race ./...
 go vet ./...
 gofmt -l .
 ```
 
-No test or example in this repository consumes Birdeye Compute Units — all tests run against `httptest` mock servers with hand-authored fixture responses.
+## Security
 
-`go test -race` requires a C compiler (cgo); if your environment doesn't have one, plain `go test ./...` still runs the full suite.
-
----
-
-## Security notice
-
-This is an unofficial, community-maintained client. Never commit a real `BIRDEYE_API_KEY` — use `.env.example` as a template and keep your actual `.env` out of version control (already gitignored here). This SDK never logs your API key or full response bodies.
-
----
-
-## Compatibility
-
-Pre-1.0: breaking changes may happen between minor versions while coverage is being built out. Not affiliated with Birdeye.
+Do not commit a real `BIRDEYE_API_KEY`. `.env.example` is safe to copy; keep your own `.env` private. The default client never logs your key or response bodies.
 
 ## License
 
 MIT. See [LICENSE](LICENSE).
-
-## Author
-
-Igor Sazonov — [@tigusigalpa](https://github.com/tigusigalpa) — sovletig@gmail.com
-
-## Links
-
-- [Birdeye API documentation](https://docs.birdeye.so/reference/birdeye-api-getting-started)
-- [Repository](https://github.com/tigusigalpa/birdeye-go)

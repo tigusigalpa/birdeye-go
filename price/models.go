@@ -5,6 +5,8 @@
 // Docs: https://docs.birdeye.so/reference/price-ohlcv
 package price
 
+import "encoding/json"
+
 // Interval values accepted by the OHLCV "type" parameter.
 //
 // Docs: https://docs.birdeye.so/reference/get-defi-v3-ohlcv
@@ -201,3 +203,41 @@ type PairOHLCVOptions struct {
 	Outlier    *bool  // default true
 	Inversion  *bool  // default false
 }
+
+// HistoricalSeriesOptions selects a bounded historical price series. AddressType
+// must be "token" or "pair"; the API performs final validation.
+type HistoricalSeriesOptions struct {
+	Chain        string
+	Address      string
+	AddressType  string
+	Type         string
+	TimeFrom     int64
+	TimeTo       int64
+	UIAmountMode string
+}
+
+// BaseQuoteOHLCVOptions selects aggregated candles for a base/quote market.
+type BaseQuoteOHLCVOptions struct {
+	Chain, BaseAddress, QuoteAddress, Type string
+	TimeFrom, TimeTo                       int64
+	UIAmountMode                           string
+}
+
+// PriceVolumeOptions selects a rolling price/volume window.
+type PriceVolumeOptions struct {
+	Chain, Type, UIAmountMode string
+}
+
+// PriceVolumeMultiRequest is the documented request body for the batch
+// price-volume endpoint. Type defaults to 24h server-side when empty.
+type PriceVolumeMultiRequest struct {
+	Addresses    []string
+	Type         string
+	Chain        string
+	UIAmountMode string
+}
+
+// RawObject preserves a successful data object whose response fields are not
+// published as a stable schema in the reference. Decode Fields into a local
+// application type when needed; unknown fields are never discarded.
+type RawObject map[string]json.RawMessage

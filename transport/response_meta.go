@@ -15,6 +15,7 @@ type ResponseMeta struct {
 	Message    string
 	RawBody    []byte
 	Headers    http.Header
+	RequestID  string
 
 	// Attempts is how many HTTP attempts were made, including retries.
 	Attempts int

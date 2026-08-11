@@ -158,3 +158,63 @@ func TestGetOHLCVv3Pair_DecodesCandles(t *testing.T) {
 		t.Errorf("unexpected: path=%s page=%+v", gotPath, page)
 	}
 }
+
+func TestGetHistoricalPriceSeries(t *testing.T) {
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/defi/history_price" || r.URL.Query().Get("address_type") != "pair" {
+			t.Fatalf("unexpected request: %s?%s", r.URL.Path, r.URL.RawQuery)
+		}
+		_, _ = w.Write([]byte(`{"success":true,"data":{"items":[{"value":1}]}}`))
+	})
+	data, err := client.GetHistoricalPriceSeries(context.Background(), HistoricalSeriesOptions{Address: "pair", AddressType: "pair", Type: Interval1H, TimeFrom: 1, TimeTo: 2})
+	if err != nil || len(data["items"]) == 0 {
+		t.Fatalf("data=%s err=%v", data["items"], err)
+	}
+}
+
+func TestGetOHLCVBaseQuote(t *testing.T) {
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/defi/ohlcv/base_quote" || r.URL.Query().Get("base_address") != "base" {
+			t.Fatalf("unexpected request: %s?%s", r.URL.Path, r.URL.RawQuery)
+		}
+		_, _ = w.Write([]byte(`{"success":true,"data":{"items":[]}}`))
+	})
+	data, err := client.GetOHLCVBaseQuote(context.Background(), BaseQuoteOHLCVOptions{BaseAddress: "base", QuoteAddress: "quote", Type: Interval1H, TimeFrom: 1, TimeTo: 2})
+	if err != nil || data == nil {
+		t.Fatalf("data=%v err=%v", data, err)
+	}
+}
+
+func TestGetPriceVolume(t *testing.T) {
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/defi/price_volume/single" || r.URL.Query().Get("type") != "24h" {
+			t.Fatalf("unexpected request: %s?%s", r.URL.Path, r.URL.RawQuery)
+		}
+		_, _ = w.Write([]byte(`{"success":true,"data":{"price":1}}`))
+	})
+	data, err := client.GetPriceVolume(context.Background(), "token", PriceVolumeOptions{Type: "24h"})
+	if err != nil || len(data["price"]) == 0 {
+		t.Fatalf("data=%v err=%v", data, err)
+	}
+}
+
+func TestGetMultiPriceVolume(t *testing.T) {
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/defi/price_volume/multi" || r.Method != http.MethodPost {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		var body struct {
+			ListAddress string `json:"list_address"`
+			Type        string `json:"type"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body.ListAddress != "a,b" || body.Type != "1h" {
+			t.Fatalf("unexpected body: %+v", body)
+		}
+		_, _ = w.Write([]byte(`{"success":true,"data":{"a":{"price":1}}}`))
+	})
+	data, err := client.GetMultiPriceVolume(context.Background(), PriceVolumeMultiRequest{Addresses: []string{"a", "b"}, Type: "1h"})
+	if err != nil || data == nil {
+		t.Fatalf("data=%v err=%v", data, err)
+	}
+}
