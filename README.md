@@ -321,6 +321,10 @@ go vet ./...
 gofmt -l .
 ```
 
+Every push to `main` and every pull request runs the same formatting check,
+`go vet`, race-enabled test suite, coverage collection, and package/example
+build in [GitHub Actions](.github/workflows/ci.yml).
+
 Never commit a real `BIRDEYE_API_KEY`. Keep production keys in your deployment platform's secret store, rotate them if exposed, and avoid printing full upstream response bodies in application logs.
 
 ## License
