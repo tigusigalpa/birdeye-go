@@ -20,7 +20,7 @@ func main() {
 	client := birdeye.NewClient(apiKey, birdeye.WithChain(birdeye.ChainSolana))
 
 	// Wrapped SOL.
-	result, err := client.Price.GetPrice(context.Background(), "So11111111111111111111111111111111111111112", price.PriceOptions{})
+	result, err := client.Price.GetPrice(context.Background(), "So11111111111111111111111111111111111111112", price.Options{})
 	if err != nil {
 		log.Fatal(err)
 	}

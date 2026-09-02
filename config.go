@@ -48,14 +48,19 @@ const (
 // Re-exported from package transport so callers only need to import
 // package birdeye for the common case.
 type (
-	Clock       = transport.Clock
-	Logger      = transport.Logger
+	// Clock supplies the current time to client components that need it.
+	Clock = transport.Clock
+	// Logger receives structured client lifecycle messages.
+	Logger = transport.Logger
+	// RetryPolicy configures automatic retry behaviour for eligible requests.
 	RetryPolicy = transport.RetryPolicy
 )
 
 var (
+	// NewDefaultRetryPolicy creates the SDK's conservative default retry policy.
 	NewDefaultRetryPolicy = transport.NewDefaultRetryPolicy
-	NoRetry               = transport.NoRetry
+	// NoRetry creates a retry policy that makes one attempt only.
+	NoRetry = transport.NoRetry
 )
 
 // ClientConfig holds every configurable knob of a Client. Zero value is
@@ -92,18 +97,26 @@ func WithChain(chain string) Option {
 	return func(c *ClientConfig) { c.DefaultChain = chain }
 }
 
+// WithHTTPClient uses hc to make API requests. Its timeout and transport are
+// preserved, so WithTimeout has no effect when this option is used.
 func WithHTTPClient(hc *http.Client) Option {
 	return func(c *ClientConfig) { c.HTTPClient = hc }
 }
 
+// WithTimeout sets the timeout of the SDK-created HTTP client. Use
+// WithHTTPClient to configure a custom client directly.
 func WithTimeout(d time.Duration) Option {
 	return func(c *ClientConfig) { c.Timeout = d }
 }
 
+// WithClock injects a clock used by retry timing. It is mainly useful for
+// deterministic tests.
 func WithClock(clock Clock) Option {
 	return func(c *ClientConfig) { c.Clock = clock }
 }
 
+// WithLogger sets the structured logger used by the client. The default logger
+// discards all messages.
 func WithLogger(logger Logger) Option {
 	return func(c *ClientConfig) { c.Logger = logger }
 }

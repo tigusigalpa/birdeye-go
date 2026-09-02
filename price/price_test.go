@@ -28,7 +28,7 @@ func TestGetPrice(t *testing.T) {
 		_, _ = w.Write([]byte(`{"success":true,"data":{"value":123.45,"updateUnixTime":1700000000,"updateHumanTime":"2023-11-14T22:13:20","priceChange24h":1.5}}`))
 	})
 
-	price, err := client.GetPrice(context.Background(), "So11111111111111111111111111111111111111112", PriceOptions{})
+	price, err := client.GetPrice(context.Background(), "So11111111111111111111111111111111111111112", Options{})
 	if err != nil {
 		t.Fatalf("GetPrice: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestGetPrice_SendsOptionalParams(t *testing.T) {
 
 	includeLiquidity := true
 	checkLiquidity := 100.0
-	_, err := client.GetPrice(context.Background(), "addr", PriceOptions{
+	_, err := client.GetPrice(context.Background(), "addr", Options{
 		IncludeLiquidity: &includeLiquidity,
 		CheckLiquidity:   &checkLiquidity,
 		UIAmountMode:     UIAmountModeScaled,
@@ -71,7 +71,7 @@ func TestGetMultiPrice_JoinsAddressesAndDecodesNullEntries(t *testing.T) {
 		_, _ = w.Write([]byte(`{"success":true,"data":{"addr1":{"value":1},"addr2":null}}`))
 	})
 
-	result, err := client.GetMultiPrice(context.Background(), []string{"addr1", "addr2"}, PriceOptions{})
+	result, err := client.GetMultiPrice(context.Background(), []string{"addr1", "addr2"}, Options{})
 	if err != nil {
 		t.Fatalf("GetMultiPrice: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestGetMultiPricePOST_SendsCommaStringInBody(t *testing.T) {
 		_, _ = w.Write([]byte(`{"success":true,"data":{"addr1":{"value":1}}}`))
 	})
 
-	_, err := client.GetMultiPricePOST(context.Background(), []string{"addr1", "addr2"}, PriceOptions{})
+	_, err := client.GetMultiPricePOST(context.Background(), []string{"addr1", "addr2"}, Options{})
 	if err != nil {
 		t.Fatalf("GetMultiPricePOST: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestGetPriceVolume(t *testing.T) {
 		}
 		_, _ = w.Write([]byte(`{"success":true,"data":{"price":1}}`))
 	})
-	data, err := client.GetPriceVolume(context.Background(), "token", PriceVolumeOptions{Type: "24h"})
+	data, err := client.GetPriceVolume(context.Background(), "token", VolumeOptions{Type: "24h"})
 	if err != nil || len(data["price"]) == 0 {
 		t.Fatalf("data=%v err=%v", data, err)
 	}
@@ -213,8 +213,80 @@ func TestGetMultiPriceVolume(t *testing.T) {
 		}
 		_, _ = w.Write([]byte(`{"success":true,"data":{"a":{"price":1}}}`))
 	})
-	data, err := client.GetMultiPriceVolume(context.Background(), PriceVolumeMultiRequest{Addresses: []string{"a", "b"}, Type: "1h"})
+	data, err := client.GetMultiPriceVolume(context.Background(), VolumeMultiRequest{Addresses: []string{"a", "b"}, Type: "1h"})
 	if err != nil || data == nil {
 		t.Fatalf("data=%v err=%v", data, err)
+	}
+}
+
+func TestMethods_SerializeOptionalParameters(t *testing.T) {
+	truth := true
+	liquidity := 10.5
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		switch r.URL.Path {
+		case "/defi/price", "/defi/multi_price":
+			if query.Get("include_liquidity") != "true" || query.Get("check_liquidity") != "10.5" || query.Get("ui_amount_mode") != UIAmountModeBoth {
+				t.Errorf("price query = %v", query)
+			}
+			if r.Method == http.MethodPost && r.Header.Get("Content-Type") != "application/json" {
+				t.Errorf("content type = %q", r.Header.Get("Content-Type"))
+			}
+			_, _ = w.Write([]byte(`{"success":true,"data":{"token":{"value":1}}}`))
+		case "/defi/historical_price_unix":
+			if query.Get("ui_amount_mode") != UIAmountModeScaled {
+				t.Errorf("historical query = %v", query)
+			}
+			_, _ = w.Write([]byte(`{"success":true,"data":{"value":1}}`))
+		case "/defi/v3/ohlcv":
+			if query.Get("currency") != CurrencyNative || query.Get("mode") != OHLCVModeCount || query.Get("count_limit") != "2" || query.Get("padding") != "true" || query.Get("outlier") != "true" || query.Get("ui_amount_mode") != UIAmountModeBoth {
+				t.Errorf("token OHLCV query = %v", query)
+			}
+			_, _ = w.Write([]byte(`{"success":true,"data":{"items":[]}}`))
+		case "/defi/v3/ohlcv/pair":
+			if query.Get("mode") != OHLCVModeCount || query.Get("count_limit") != "2" || query.Get("padding") != "true" || query.Get("outlier") != "true" || query.Get("inversion") != "true" {
+				t.Errorf("pair OHLCV query = %v", query)
+			}
+			_, _ = w.Write([]byte(`{"success":true,"data":{"items":[]}}`))
+		case "/defi/history_price", "/defi/ohlcv/base_quote", "/defi/price_volume/single", "/defi/price_volume/multi":
+			if query.Get("ui_amount_mode") != UIAmountModeScaled {
+				t.Errorf("raw-object query = %v", query)
+			}
+			_, _ = w.Write([]byte(`{"success":true,"data":{}}`))
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	})
+
+	options := Options{IncludeLiquidity: &truth, CheckLiquidity: &liquidity, UIAmountMode: UIAmountModeBoth}
+	if _, err := client.GetPrice(context.Background(), "token", options); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.GetMultiPrice(context.Background(), []string{"token"}, options); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.GetMultiPricePOST(context.Background(), []string{"token"}, options); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.GetHistoricalPriceByUnixTime(context.Background(), "token", HistoricalPriceOptions{UIAmountMode: UIAmountModeScaled}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.GetOHLCVv3(context.Background(), TokenOHLCVOptions{Address: "token", Type: Interval1H, Currency: CurrencyNative, Mode: OHLCVModeCount, CountLimit: 2, Padding: &truth, Outlier: &truth, UIAmountMode: UIAmountModeBoth}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.GetOHLCVv3Pair(context.Background(), PairOHLCVOptions{Address: "pair", Type: Interval1H, Mode: OHLCVModeCount, CountLimit: 2, Padding: &truth, Outlier: &truth, Inversion: &truth}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.GetHistoricalPriceSeries(context.Background(), HistoricalSeriesOptions{Address: "token", AddressType: "token", Type: Interval1H, UIAmountMode: UIAmountModeScaled}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.GetOHLCVBaseQuote(context.Background(), BaseQuoteOHLCVOptions{BaseAddress: "base", QuoteAddress: "quote", Type: Interval1H, UIAmountMode: UIAmountModeScaled}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.GetPriceVolume(context.Background(), "token", VolumeOptions{Type: "1h", UIAmountMode: UIAmountModeScaled}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.GetMultiPriceVolume(context.Background(), VolumeMultiRequest{Addresses: []string{"token"}, UIAmountMode: UIAmountModeScaled}); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -279,3 +279,75 @@ func TestMapHTTPStatus_Success(t *testing.T) {
 		t.Errorf("expected nil for 200, got %v", err)
 	}
 }
+
+func TestMapHTTPStatus(t *testing.T) {
+	tests := []struct {
+		status int
+		want   error
+	}{
+		{201, nil}, {400, ErrBadRequest}, {401, ErrUnauthorized}, {403, ErrForbidden},
+		{404, ErrNotFound}, {429, ErrRateLimited}, {500, ErrServerError}, {418, ErrBadRequest}, {302, nil},
+	}
+	for _, test := range tests {
+		if got := MapHTTPStatus(test.status); !errors.Is(got, test.want) {
+			t.Errorf("MapHTTPStatus(%d) = %v, want %v", test.status, got, test.want)
+		}
+	}
+}
+
+func TestNewExecutor_DefaultsAndHelpers(t *testing.T) {
+	exec := NewExecutor(ExecutorConfig{})
+	if exec.cfg.BaseURL == "" || exec.cfg.HTTPClient == nil || exec.cfg.Clock == nil || exec.cfg.Logger == nil || exec.cfg.RetryPolicy == nil {
+		t.Fatalf("defaults were not applied: %+v", exec.cfg)
+	}
+	if policy := NewDefaultRetryPolicy(); policy.MaxAttempts != 3 || policy.BaseDelay <= 0 || policy.MaxDelay <= 0 {
+		t.Fatalf("unexpected default policy: %+v", policy)
+	}
+	logger := NoopLogger{}
+	logger.Debug("debug")
+	logger.Info("info")
+	logger.Warn("warn")
+	logger.Error("error")
+}
+
+func TestRetryDelayAndRetryableClassification(t *testing.T) {
+	policy := &RetryPolicy{BaseDelay: time.Millisecond, MaxDelay: 4 * time.Millisecond}
+	if delay := retryDelay(policy, 1, &ResponseMeta{Headers: http.Header{"Retry-After": {"0"}}}); delay != 0 {
+		t.Errorf("retry delay = %s, want 0", delay)
+	}
+	date := time.Now().Add(time.Second).UTC().Format(http.TimeFormat)
+	if delay := retryDelay(policy, 1, &ResponseMeta{Headers: http.Header{"Retry-After": {date}}}); delay <= 0 {
+		t.Errorf("HTTP-date retry delay = %s, want positive", delay)
+	}
+	if delay := retryDelay(policy, 3, &ResponseMeta{Headers: http.Header{"Retry-After": {"invalid"}}}); delay < 0 || delay > policy.MaxDelay {
+		t.Errorf("fallback retry delay = %s", delay)
+	}
+	if !isRetryable(nil, errors.New("connection refused")) {
+		t.Error("missing response should be retryable")
+	}
+	if isRetryable(nil, context.Canceled) || isRetryable(nil, context.DeadlineExceeded) {
+		t.Error("cancelled contexts must not be retryable")
+	}
+	if !isRetryable(&ResponseMeta{HTTPStatus: http.StatusTooManyRequests}, errors.New("rate limited")) {
+		t.Error("429 should be retryable")
+	}
+	if isRetryable(&ResponseMeta{HTTPStatus: http.StatusInternalServerError}, errors.New("server error")) {
+		t.Error("500 should not be retryable")
+	}
+}
+
+func TestDo_QueryFilteringAndInvalidPayloads(t *testing.T) {
+	exec, _ := newTestExecutor(t, func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.RawQuery; got != "keep=value" {
+			t.Errorf("query = %q, want keep=value", got)
+		}
+		_, _ = w.Write([]byte(`not-json`))
+	}, "k")
+	if _, err := exec.Do(context.Background(), http.MethodGet, "/path", map[string]string{"keep": "value", "omit": ""}, "", nil, nil); err == nil {
+		t.Fatal("invalid envelope did not return an error")
+	}
+
+	if _, err := exec.Do(context.Background(), http.MethodPost, "/path", nil, "", make(chan int), nil); err == nil {
+		t.Fatal("unmarshalable body did not return an error")
+	}
+}

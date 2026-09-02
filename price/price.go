@@ -33,7 +33,7 @@ func boolQuery(v *bool) string {
 // the envelope's outer "success" is still true in that case.
 //
 // Docs: https://docs.birdeye.so/reference/get-defi-price
-func (c *Client) GetPrice(ctx context.Context, address string, opts PriceOptions) (*PriceData, error) {
+func (c *Client) GetPrice(ctx context.Context, address string, opts Options) (*Data, error) {
 	query := map[string]string{"address": address}
 	if opts.IncludeLiquidity != nil {
 		query["include_liquidity"] = boolQuery(opts.IncludeLiquidity)
@@ -44,7 +44,7 @@ func (c *Client) GetPrice(ctx context.Context, address string, opts PriceOptions
 	if opts.UIAmountMode != "" {
 		query["ui_amount_mode"] = opts.UIAmountMode
 	}
-	var result PriceData
+	var result Data
 	if _, err := c.executor.Do(ctx, http.MethodGet, "/defi/price", query, opts.Chain, nil, &result); err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (c *Client) GetPrice(ctx context.Context, address string, opts PriceOptions
 // price data for.
 //
 // Docs: https://docs.birdeye.so/reference/get-defi-multi_price
-func (c *Client) GetMultiPrice(ctx context.Context, addresses []string, opts PriceOptions) (map[string]*PriceData, error) {
+func (c *Client) GetMultiPrice(ctx context.Context, addresses []string, opts Options) (map[string]*Data, error) {
 	query := map[string]string{"list_address": strings.Join(addresses, ",")}
 	if opts.IncludeLiquidity != nil {
 		query["include_liquidity"] = boolQuery(opts.IncludeLiquidity)
@@ -68,7 +68,7 @@ func (c *Client) GetMultiPrice(ctx context.Context, addresses []string, opts Pri
 	if opts.UIAmountMode != "" {
 		query["ui_amount_mode"] = opts.UIAmountMode
 	}
-	var result map[string]*PriceData
+	var result map[string]*Data
 	if _, err := c.executor.Do(ctx, http.MethodGet, "/defi/multi_price", query, opts.Chain, nil, &result); err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (c *Client) GetMultiPrice(ctx context.Context, addresses []string, opts Pri
 // Birdeye's documented request shape.
 //
 // Docs: https://docs.birdeye.so/reference/post-defi-multi_price
-func (c *Client) GetMultiPricePOST(ctx context.Context, addresses []string, opts PriceOptions) (map[string]*PriceData, error) {
+func (c *Client) GetMultiPricePOST(ctx context.Context, addresses []string, opts Options) (map[string]*Data, error) {
 	query := map[string]string{}
 	if opts.IncludeLiquidity != nil {
 		query["include_liquidity"] = boolQuery(opts.IncludeLiquidity)
@@ -98,7 +98,7 @@ func (c *Client) GetMultiPricePOST(ctx context.Context, addresses []string, opts
 	body := struct {
 		ListAddress string `json:"list_address"`
 	}{ListAddress: strings.Join(addresses, ",")}
-	var result map[string]*PriceData
+	var result map[string]*Data
 	if _, err := c.executor.Do(ctx, http.MethodPost, "/defi/multi_price", query, opts.Chain, body, &result); err != nil {
 		return nil, err
 	}
@@ -237,7 +237,7 @@ func (c *Client) GetOHLCVBaseQuote(ctx context.Context, opts BaseQuoteOHLCVOptio
 // a stable field schema for this endpoint.
 //
 // Docs: https://docs.birdeye.so/reference/get-defi-price_volume-single
-func (c *Client) GetPriceVolume(ctx context.Context, address string, opts PriceVolumeOptions) (RawObject, error) {
+func (c *Client) GetPriceVolume(ctx context.Context, address string, opts VolumeOptions) (RawObject, error) {
 	query := map[string]string{"address": address}
 	if opts.Type != "" {
 		query["type"] = opts.Type
@@ -254,7 +254,7 @@ func (c *Client) GetPriceVolume(ctx context.Context, address string, opts PriceV
 // tokens. POST requests are deliberately not retried by the shared transport.
 //
 // Docs: https://docs.birdeye.so/reference/post-defi-price_volume-multi
-func (c *Client) GetMultiPriceVolume(ctx context.Context, request PriceVolumeMultiRequest) (RawObject, error) {
+func (c *Client) GetMultiPriceVolume(ctx context.Context, request VolumeMultiRequest) (RawObject, error) {
 	query := map[string]string{}
 	if request.UIAmountMode != "" {
 		query["ui_amount_mode"] = request.UIAmountMode

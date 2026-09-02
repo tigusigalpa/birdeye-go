@@ -51,28 +51,28 @@ const (
 	CurrencyNative = "native"
 )
 
-// PriceData is a single token's real-time price, returned by GetPrice
+// Data is a single token's real-time price, returned by GetPrice
 // (as a single object) and GetMultiPrice/GetMultiPricePOST (as map
 // values, which may be nil per Birdeye's docs — an address with no
 // price data decodes as a nil map entry, not an error).
 //
 // Docs: https://docs.birdeye.so/reference/get-defi-price
-type PriceData struct {
+type Data struct {
 	Value               float64 `json:"value"`
 	UpdateUnixTime      int64   `json:"updateUnixTime"`
 	UpdateHumanTime     string  `json:"updateHumanTime"`
 	PriceChange24h      float64 `json:"priceChange24h"`
 	PriceInNative       float64 `json:"priceInNative,omitempty"`
 	Liquidity           float64 `json:"liquidity,omitempty"`
-	IsScaledUiToken     bool    `json:"isScaledUiToken,omitempty"`
+	IsScaledUIToken     bool    `json:"isScaledUiToken,omitempty"`
 	ScaledValue         float64 `json:"scaledValue,omitempty"`
 	Multiplier          float64 `json:"multiplier,omitempty"`
 	ScaledPriceInNative float64 `json:"scaledPriceInNative,omitempty"`
 }
 
-// PriceOptions are the shared optional filters for GetPrice,
+// Options are the shared optional filters for GetPrice,
 // GetMultiPrice, and GetMultiPricePOST.
-type PriceOptions struct {
+type Options struct {
 	// Chain overrides the client's default x-chain header for this call
 	// only ("" to use the client default).
 	Chain string
@@ -88,7 +88,7 @@ type PriceOptions struct {
 //
 // Docs: https://docs.birdeye.so/reference/get-defi-historical_price_unix
 type HistoricalPrice struct {
-	IsScaledUiToken bool    `json:"isScaledUiToken"`
+	IsScaledUIToken bool    `json:"isScaledUiToken"`
 	Value           float64 `json:"value"`
 	UpdateUnixTime  int64   `json:"updateUnixTime"`
 	PriceChange24h  float64 `json:"priceChange24h"`
@@ -136,7 +136,7 @@ type Candle struct {
 // TokenOHLCVPage is the envelope returned by GetOHLCVv3.
 type TokenOHLCVPage struct {
 	Items           []Candle `json:"items"`
-	IsScaledUiToken bool     `json:"is_scaled_ui_token"`
+	IsScaledUIToken bool     `json:"is_scaled_ui_token"`
 	Multiplier      float64  `json:"multiplier,omitempty"`
 }
 
@@ -223,14 +223,14 @@ type BaseQuoteOHLCVOptions struct {
 	UIAmountMode                           string
 }
 
-// PriceVolumeOptions selects a rolling price/volume window.
-type PriceVolumeOptions struct {
+// VolumeOptions selects a rolling price/volume window.
+type VolumeOptions struct {
 	Chain, Type, UIAmountMode string
 }
 
-// PriceVolumeMultiRequest is the documented request body for the batch
+// VolumeMultiRequest is the documented request body for the batch
 // price-volume endpoint. Type defaults to 24h server-side when empty.
-type PriceVolumeMultiRequest struct {
+type VolumeMultiRequest struct {
 	Addresses    []string
 	Type         string
 	Chain        string

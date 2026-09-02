@@ -4,9 +4,9 @@ This is the source-of-truth list for the typed SDK surface. Every row has an off
 
 | SDK method | HTTP | API route | Response | Official documentation |
 |---|---:|---|---|---|
-| `Client.Price.GetPrice` | GET | `/defi/price` | `*PriceData` | [Price](https://docs.birdeye.so/reference/get-defi-price) |
-| `Client.Price.GetMultiPrice` | GET | `/defi/multi_price` | `map[string]*PriceData` | [Multi price (GET)](https://docs.birdeye.so/reference/get-defi-multi_price) |
-| `Client.Price.GetMultiPricePOST` | POST | `/defi/multi_price` | `map[string]*PriceData` | [Multi price (POST)](https://docs.birdeye.so/reference/post-defi-multi_price) |
+| `Client.Price.GetPrice` | GET | `/defi/price` | `*Data` | [Price](https://docs.birdeye.so/reference/get-defi-price) |
+| `Client.Price.GetMultiPrice` | GET | `/defi/multi_price` | `map[string]*Data` | [Multi price (GET)](https://docs.birdeye.so/reference/get-defi-multi_price) |
+| `Client.Price.GetMultiPricePOST` | POST | `/defi/multi_price` | `map[string]*Data` | [Multi price (POST)](https://docs.birdeye.so/reference/post-defi-multi_price) |
 | `Client.Price.GetHistoricalPriceByUnixTime` | GET | `/defi/historical_price_unix` | `*HistoricalPrice` | [Historical price by Unix time](https://docs.birdeye.so/reference/get-defi-historical_price_unix) |
 | `Client.Price.GetHistoricalPriceSeries` | GET | `/defi/history_price` | `RawObject` | [Historical price](https://docs.birdeye.so/reference/get-defi-history_price) |
 | `Client.Price.GetOHLCVv3` | GET | `/defi/v3/ohlcv` | `*TokenOHLCVPage` | [OHLCV V3](https://docs.birdeye.so/reference/get-defi-v3-ohlcv) |

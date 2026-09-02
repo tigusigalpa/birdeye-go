@@ -6,7 +6,6 @@
 [![Tests](https://github.com/tigusigalpa/birdeye-go/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/tigusigalpa/birdeye-go/actions/workflows/test.yml)
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
-[![Go Report Card](https://goreportcard.com/badge/github.com/tigusigalpa/birdeye-go?style=flat-square)](https://goreportcard.com/report/github.com/tigusigalpa/birdeye-go)
 [![CodeQL](https://github.com/tigusigalpa/birdeye-go/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/tigusigalpa/birdeye-go/actions/workflows/codeql.yml)
 [![Codecov](https://codecov.io/gh/tigusigalpa/birdeye-go/graph/badge.svg)](https://codecov.io/gh/tigusigalpa/birdeye-go)
 [![GitHub Release](https://img.shields.io/github/v/release/tigusigalpa/birdeye-go?style=flat-square)](https://github.com/tigusigalpa/birdeye-go/releases)
@@ -79,7 +78,7 @@ Available options:
 Every request options struct has a `Chain` field. It wins over the client's default:
 
 ```go
-quote, err := client.Price.GetPrice(ctx, token, price.PriceOptions{
+quote, err := client.Price.GetPrice(ctx, token, price.Options{
     Chain: birdeye.ChainEthereum,
 })
 ```
@@ -112,7 +111,7 @@ func main() {
     quote, err := client.Price.GetPrice(
         context.Background(),
         "So11111111111111111111111111111111111111112",
-        price.PriceOptions{},
+        price.Options{},
     )
     if err != nil {
         log.Fatal(err)
@@ -136,7 +135,7 @@ Optional booleans and numeric filters use pointers so that `false` and `0` can b
 includeLiquidity := true
 minimumLiquidity := 25_000.0
 
-quote, err := client.Price.GetPrice(ctx, token, price.PriceOptions{
+quote, err := client.Price.GetPrice(ctx, token, price.Options{
     IncludeLiquidity: &includeLiquidity,
     CheckLiquidity:   &minimumLiquidity,
 })
@@ -153,7 +152,7 @@ Use the GET variant for a short list. A returned `nil` map value means that Bird
 prices, err := client.Price.GetMultiPrice(ctx, []string{
     "So11111111111111111111111111111111111111112", // SOL
     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
-}, price.PriceOptions{})
+}, price.Options{})
 if err != nil { return err }
 
 for address, quote := range prices {
@@ -220,7 +219,7 @@ if err := json.Unmarshal(series["items"], &items); err != nil { return err }
 ### Add rolling volume to a token card
 
 ```go
-snapshot, err := client.Price.GetPriceVolume(ctx, token, price.PriceVolumeOptions{
+snapshot, err := client.Price.GetPriceVolume(ctx, token, price.VolumeOptions{
     Type: "24h",
 })
 if err != nil { return err }
@@ -237,7 +236,7 @@ for field, raw := range snapshot {
 
 | Area | Methods | Response |
 |---|---|---|
-| Spot prices | `GetPrice`, `GetMultiPrice`, `GetMultiPricePOST` | Typed `PriceData` |
+| Spot prices | `GetPrice`, `GetMultiPrice`, `GetMultiPricePOST` | Typed `Data` |
 | Historical prices | `GetHistoricalPriceByUnixTime`, `GetHistoricalPriceSeries` | Typed point / `RawObject` series |
 | Candles | `GetOHLCVv3`, `GetOHLCVv3Pair`, `GetOHLCVBaseQuote` | Typed V3 candles / `RawObject` |
 | Rolling activity | `GetPriceVolume`, `GetMultiPriceVolume` | `RawObject` |
@@ -251,7 +250,7 @@ The upstream-deprecated `/defi/ohlcv` and `/defi/ohlcv/pair` routes are intentio
 Use `errors.Is` for the action your application should take. Use `errors.As` when you need diagnostic details for logging or support.
 
 ```go
-_, err := client.Price.GetPrice(ctx, token, price.PriceOptions{})
+_, err := client.Price.GetPrice(ctx, token, price.Options{})
 switch {
 case err == nil:
     // success
@@ -334,6 +333,11 @@ gofmt -l .
 Every push to `main` and every pull request runs the same formatting check,
 `go vet`, race-enabled test suite, coverage collection, and package/example
 build in [GitHub Actions](.github/workflows/ci.yml).
+
+Codecov measures the SDK packages (`.`, `./price`, and `./transport`) and
+enforces an 80% minimum for both project and patch coverage. Executable
+examples are built in CI but excluded from coverage because they intentionally
+do not contain unit tests or make live API calls.
 
 Never commit a real `BIRDEYE_API_KEY`. Keep production keys in your deployment platform's secret store, rotate them if exposed, and avoid printing full upstream response bodies in application logs.
 

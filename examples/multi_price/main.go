@@ -23,7 +23,7 @@ func main() {
 		"So11111111111111111111111111111111111111112",  // wrapped SOL
 		"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
 	}
-	prices, err := client.Price.GetMultiPrice(context.Background(), addresses, price.PriceOptions{})
+	prices, err := client.Price.GetMultiPrice(context.Background(), addresses, price.Options{})
 	if err != nil {
 		log.Fatal(err)
 	}

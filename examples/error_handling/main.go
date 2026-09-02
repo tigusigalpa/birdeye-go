@@ -23,7 +23,7 @@ func main() {
 	client := birdeye.NewClient(apiKey, birdeye.WithChain(birdeye.ChainSolana))
 
 	// A syntactically invalid address should trigger a 4xx from Birdeye.
-	_, err := client.Price.GetPrice(context.Background(), "not-a-real-address", price.PriceOptions{})
+	_, err := client.Price.GetPrice(context.Background(), "not-a-real-address", price.Options{})
 	if err == nil {
 		fmt.Println("unexpectedly succeeded")
 		return
