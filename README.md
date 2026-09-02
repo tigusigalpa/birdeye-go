@@ -2,6 +2,16 @@
 
 ![Birdeye Golang SDK](https://i.postimg.cc/FFqTsjMG/birdeye-golang-github.jpg)
 
+[![CI](https://github.com/tigusigalpa/birdeye-go/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/tigusigalpa/birdeye-go/actions/workflows/ci.yml)
+[![Tests](https://github.com/tigusigalpa/birdeye-go/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/tigusigalpa/birdeye-go/actions/workflows/test.yml)
+[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go)](https://golang.org/)
+[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/tigusigalpa/birdeye-go?style=flat-square)](https://goreportcard.com/report/github.com/tigusigalpa/birdeye-go)
+[![CodeQL](https://github.com/tigusigalpa/birdeye-go/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/tigusigalpa/birdeye-go/actions/workflows/codeql.yml)
+[![Codecov](https://codecov.io/gh/tigusigalpa/birdeye-go/graph/badge.svg)](https://codecov.io/gh/tigusigalpa/birdeye-go)
+[![GitHub Release](https://img.shields.io/github/v/release/tigusigalpa/birdeye-go?style=flat-square)](https://github.com/tigusigalpa/birdeye-go/releases)
+[![GoDoc](https://img.shields.io/badge/godoc-reference-blue?style=flat-square&logo=go)](https://pkg.go.dev/github.com/tigusigalpa/birdeye-go)
+
 An idiomatic, context-first Go client for the [Birdeye public API](https://docs.birdeye.so/reference/birdeye-api-getting-started). It currently focuses on the price and OHLCV workflows that most trading dashboards, portfolio tools, and market monitors need first.
 
 The SDK handles authentication, JSON envelopes, request metadata, typed API errors, and conservative retries. It also includes a raw request API, so a new Birdeye endpoint never has to block your work.
